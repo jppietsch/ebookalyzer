@@ -56,6 +56,8 @@ import de.jppietsch.epub.EPub;
 
 public final class EBookalyzerFrame extends JFrame {
 
+    private static final String TITLE = "Ebookalyzer";
+
     private static final String ENTITIES_EXTENSION = "entities";
 
     private final JTextPane chapterPane = new JTextPane();
@@ -132,7 +134,7 @@ public final class EBookalyzerFrame extends JFrame {
     }, "lastPage");
 
     public EBookalyzerFrame() {
-        super("Ebookalyzer");
+        super(TITLE);
 
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
@@ -181,6 +183,7 @@ public final class EBookalyzerFrame extends JFrame {
             try {
                 epub = new EPub(chooser.getSelectedFile());
                 page = 3;
+                setTitle(TITLE + " - " + epub.getTitle());
                 displayPage();
             } catch (IOException e) {
                 e.printStackTrace();

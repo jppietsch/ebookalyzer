@@ -27,6 +27,7 @@ import org.w3c.dom.NodeList;
 public final class EPub {
 
     private final List<Chapter> chapters = new ArrayList<Chapter>();
+    private String title;
 
     public EPub(String name) throws IOException {
         this(new Zip(name));
@@ -58,11 +59,15 @@ public final class EPub {
         return rootfiles.item(0).getAttributes().getNamedItem("full-path").getNodeValue();
     }
 
-    private static String analyseContent(Zip file, String name) {
+    private String analyseContent(Zip file, String name) {
         Document document = file.document(name);
         String namespace = "http://www.idpf.org/2007/opf";
         NodeList spines = document.getElementsByTagNameNS(namespace, "spine");
         String toc = spines.item(0).getAttributes().getNamedItem("toc").getNodeValue();
+
+        NodeList titles = document.getElementsByTagNameNS("http://purl.org/dc/elements/1.1/", "title");
+        title = titles.item(0).getTextContent();
+
         NodeList items = document.getElementsByTagNameNS(namespace, "item");
         for (int i = 0; i < items.getLength(); i++) {
             NamedNodeMap attributes = items.item(i).getAttributes();
@@ -70,6 +75,7 @@ public final class EPub {
                 return attributes.getNamedItem("href").getNodeValue();
             }
         }
+
         throw new RuntimeException("no toc found");
     }
 
@@ -79,6 +85,10 @@ public final class EPub {
         for (int i = 0; i < navPoints.getLength(); i++) {
             chapters.add(new Chapter(zip, (Element) navPoints.item(i), prefix));
         }
+    }
+
+    public String getTitle() {
+        return title;
     }
 
 }
