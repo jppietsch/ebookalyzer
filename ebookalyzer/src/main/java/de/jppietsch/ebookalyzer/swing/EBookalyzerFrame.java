@@ -23,7 +23,12 @@ import static javax.swing.ListSelectionModel.SINGLE_SELECTION;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.event.ActionEvent;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.ResourceBundle;
 
 import javax.swing.AbstractAction;
@@ -51,9 +56,11 @@ import de.jppietsch.epub.EPub;
 
 public final class EBookalyzerFrame extends JFrame {
 
+    private static final String ENTITIES_EXTENSION = "entities";
+
     private final JTextPane chapterPane = new JTextPane();
 
-    private final Dictionary listModel = new Dictionary();
+    private Dictionary listModel = new Dictionary();
 
     private final JList list = new JList(listModel);
 
@@ -66,6 +73,8 @@ public final class EBookalyzerFrame extends JFrame {
     private EPub epub;
 
     private int page;
+
+    private final FileNameExtensionFilter entityFilter = new FileNameExtensionFilter("Entitäten", ENTITIES_EXTENSION);
 
     private final Action createAction = init(new AbstractAction() {
         @Override
@@ -179,6 +188,51 @@ public final class EBookalyzerFrame extends JFrame {
         }
     }
 
+    void load() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setFileFilter(entityFilter);
+        int choice = chooser.showOpenDialog(this);
+        if (choice == JFileChooser.APPROVE_OPTION) {
+            try {
+                FileInputStream stream = new FileInputStream(chooser.getSelectedFile());
+                try {
+                    ObjectInputStream oos = new ObjectInputStream(stream);
+                    listModel = (Dictionary) oos.readObject();
+                    list.setModel(listModel);
+                } catch (ClassNotFoundException e) {
+                    e.printStackTrace();
+                } finally {
+                    stream.close();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    void save() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setFileFilter(entityFilter);
+        int choice = chooser.showSaveDialog(this);
+        if (choice == JFileChooser.APPROVE_OPTION) {
+            File selectedFile = chooser.getSelectedFile();
+            if (!selectedFile.getName().endsWith("." + ENTITIES_EXTENSION)) {
+                selectedFile = new File(selectedFile.getAbsolutePath() + "." + ENTITIES_EXTENSION);
+            }
+            try {
+                FileOutputStream stream = new FileOutputStream(selectedFile);
+                try {
+                    ObjectOutputStream oos = new ObjectOutputStream(stream);
+                    oos.writeObject(listModel);
+                } finally {
+                    stream.close();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
     void onSelectionChange(CaretEvent e) {
         int dot = e.getDot();
         int mark = e.getMark();
@@ -275,6 +329,20 @@ public final class EBookalyzerFrame extends JFrame {
                 open();
             }
         }, "open"));
+
+        toolbar.add(init(new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                load();
+            }
+        }, "load"));
+
+        toolbar.add(init(new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                save();
+            }
+        }, "save"));
 
         toolbar.addSeparator();
         createAction.setEnabled(false);

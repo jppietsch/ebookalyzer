@@ -14,12 +14,15 @@
 // If not, see <http://www.gnu.org/licenses/>.
 package de.jppietsch.ebookalyzer.entity;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-public final class Entity {
+public final class Entity implements Serializable {
+
+    private static final long serialVersionUID = -5278747678487301971L;
 
     private final String primaryName;
 

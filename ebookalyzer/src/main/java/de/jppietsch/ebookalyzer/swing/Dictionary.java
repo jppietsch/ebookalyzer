@@ -14,6 +14,7 @@
 // If not, see <http://www.gnu.org/licenses/>.
 package de.jppietsch.ebookalyzer.swing;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,7 +25,9 @@ import javax.swing.event.ListDataListener;
 
 import de.jppietsch.ebookalyzer.entity.Entity;
 
-public class Dictionary implements ListModel {
+public class Dictionary implements ListModel, Serializable {
+
+    private static final long serialVersionUID = -1910489426878980384L;
 
     private final List<Entity> entities = new ArrayList<Entity>();
 
