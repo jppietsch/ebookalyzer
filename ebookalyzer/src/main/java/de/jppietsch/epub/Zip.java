@@ -68,7 +68,11 @@ final class Zip {
     }
 
     String string(String name) {
-        ZipEntry entry = file.getEntry(name);
+        int hashIndex = name.lastIndexOf('#');
+        ZipEntry entry = file.getEntry(hashIndex < 0 ? name : name.substring(0, hashIndex));
+        if (entry == null) {
+            throw new IllegalArgumentException("There is no chapter " + name);
+        }
         byte[] buffer = new byte[(int) entry.getSize()];
         try {
             InputStream stream = file.getInputStream(entry);
