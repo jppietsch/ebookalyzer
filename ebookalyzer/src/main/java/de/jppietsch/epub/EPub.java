@@ -52,6 +52,22 @@ public final class EPub {
         return chapters;
     }
 
+    public String getTitle() {
+        return title;
+    }
+
+    public int search(String word) {
+        int chapterIndex = 0;
+        for (Chapter chapter: chapters) {
+            int index = chapter.search(word);
+            if (index >= 0) {
+                return chapterIndex;
+            }
+            chapterIndex++;
+        }
+        return -1;
+    }
+
     private static String analyseContainer(Zip file, String name) {
         Document document = file.document(name);
         NodeList rootfiles =
@@ -85,10 +101,6 @@ public final class EPub {
         for (int i = 0; i < navPoints.getLength(); i++) {
             chapters.add(new Chapter(zip, (Element) navPoints.item(i), prefix));
         }
-    }
-
-    public String getTitle() {
-        return title;
     }
 
 }

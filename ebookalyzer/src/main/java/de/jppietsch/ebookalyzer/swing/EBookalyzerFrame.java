@@ -37,6 +37,7 @@ import javax.swing.ImageIcon;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JList;
+import javax.swing.JOptionPane;
 import javax.swing.JScrollPane;
 import javax.swing.JTextPane;
 import javax.swing.JToolBar;
@@ -133,6 +134,13 @@ public final class EBookalyzerFrame extends JFrame {
         }
     }, "lastPage");
 
+    private final Action searchInBookAction = init(new AbstractAction() {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            searchInBook();
+        }
+    }, "searchInBook");
+
     public EBookalyzerFrame() {
         super(TITLE);
 
@@ -185,6 +193,7 @@ public final class EBookalyzerFrame extends JFrame {
                 page = 3;
                 setTitle(TITLE + " - " + epub.getTitle());
                 displayPage();
+                searchInBookAction.setEnabled(true);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -309,6 +318,24 @@ public final class EBookalyzerFrame extends JFrame {
         displayPage();
     }
 
+    void searchInBook() {
+        String word = JOptionPane.showInputDialog(this, "Suche");
+        int chapterIndex = epub.search(word);
+        if (chapterIndex >= 0) {
+            page = chapterIndex;
+            displayPage();
+            StyledDocument styledDocument = chapterPane.getStyledDocument();
+            try {
+                int offset = styledDocument.getText(0, styledDocument.getLength()).indexOf(word);
+                chapterPane.setSelectionStart(offset);
+                chapterPane.setSelectionEnd(offset + word.length());
+                chapterPane.requestFocusInWindow();
+            } catch (BadLocationException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+    }
+
     private void displayPage() {
         firstAction.setEnabled(true);
         previousAction.setEnabled(page > 0);
@@ -366,6 +393,10 @@ public final class EBookalyzerFrame extends JFrame {
         toolbar.add(nextAction);
         lastAction.setEnabled(false);
         toolbar.add(lastAction);
+
+        toolbar.addSeparator();
+        searchInBookAction.setEnabled(false);
+        toolbar.add(searchInBookAction);
 
         add(toolbar, BorderLayout.NORTH);
     }
