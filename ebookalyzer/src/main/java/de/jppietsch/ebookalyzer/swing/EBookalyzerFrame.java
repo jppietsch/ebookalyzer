@@ -30,6 +30,8 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ResourceBundle;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.swing.AbstractAction;
 import javax.swing.Action;
@@ -141,6 +143,20 @@ public final class EBookalyzerFrame extends JFrame {
         }
     }, "searchInBook");
 
+    private final Action previousOccurenceAction = init(new AbstractAction() {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            searchPreviousOccurence();
+        }
+    }, "previousOccurence");
+
+    private final Action nextOccurenceAction = init(new AbstractAction() {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            searchNextOccurence();
+        }
+    }, "nextOccurence");
+
     public EBookalyzerFrame() {
         super(TITLE);
 
@@ -190,7 +206,7 @@ public final class EBookalyzerFrame extends JFrame {
         if (choice == JFileChooser.APPROVE_OPTION) {
             try {
                 epub = new EPub(chooser.getSelectedFile());
-                page = 3;
+                page = 0;
                 setTitle(TITLE + " - " + epub.getTitle());
                 displayPage();
                 searchInBookAction.setEnabled(true);
@@ -274,7 +290,10 @@ public final class EBookalyzerFrame extends JFrame {
             int selectedIndex = list.getSelectedIndex();
             selectedEntity = selectedIndex < 0 ? null : listModel.getElementAt(selectedIndex);
             highlight(document, true);
-            deleteAction.setEnabled(selectedEntity != null);
+            boolean selected = selectedEntity != null;
+            deleteAction.setEnabled(selected);
+            previousOccurenceAction.setEnabled(selected);
+            nextOccurenceAction.setEnabled(selected);
             boolean full = currentSelection != null && selectedEntity != null;
             associateAction.setEnabled(full);
             dissociateAction.setEnabled(full);
@@ -327,13 +346,57 @@ public final class EBookalyzerFrame extends JFrame {
             StyledDocument styledDocument = chapterPane.getStyledDocument();
             try {
                 int offset = styledDocument.getText(0, styledDocument.getLength()).indexOf(word);
-                chapterPane.setSelectionStart(offset);
-                chapterPane.setSelectionEnd(offset + word.length());
-                chapterPane.requestFocusInWindow();
+                select(offset, word);
             } catch (BadLocationException e) {
                 throw new IllegalStateException(e);
             }
         }
+    }
+
+    void searchPreviousOccurence() {
+        Pattern pattern = selectedEntity.getPattern();
+        StyledDocument document = chapterPane.getStyledDocument();
+        try {
+            int caretPosition = chapterPane.getCaretPosition();
+            Matcher matcher = pattern.matcher(document.getText(0, caretPosition - 1));
+            int offset = -1;
+            String token = null;
+            while (matcher.find()) {
+                offset = matcher.start();
+                token = matcher.group();
+            }
+            if (token == null) {
+                System.out.println("kein voriges Vorkommen gefunden im aktuellen Kapitel.");
+            } else {
+                System.out.println("voriges Vorkommen gefunden an Position " + offset);
+                select(offset, token);
+            }
+        } catch (BadLocationException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    void searchNextOccurence() {
+        Pattern pattern = selectedEntity.getPattern();
+        StyledDocument document = chapterPane.getStyledDocument();
+        try {
+            int caretPosition = chapterPane.getCaretPosition();
+            Matcher matcher = pattern.matcher(document.getText(caretPosition, document.getLength() - caretPosition));
+            if (matcher.find()) {
+                System.out.println("weiteres Vorkommen gefunden an Position " + matcher.start());
+                select(caretPosition + matcher.start(), matcher.group());
+            } else {
+                System.out.println("kein weiteres Vorkommen gefunden im aktuellen Kapitel.");
+            }
+        } catch (BadLocationException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private void select(int offset, String word) {
+        chapterPane.setSelectionStart(offset);
+        chapterPane.setSelectionEnd(offset + word.length());
+        chapterPane.requestFocusInWindow();
     }
 
     private void displayPage() {
@@ -346,6 +409,7 @@ public final class EBookalyzerFrame extends JFrame {
         String text = epub.getChapters().get(page).getText();
         chapterPane.setText(text);
         highlight((StyledDocument) chapterPane.getDocument(), true);
+        chapterPane.setCaretPosition(0);
     }
 
     private void initToolBar() {
@@ -397,6 +461,10 @@ public final class EBookalyzerFrame extends JFrame {
         toolbar.addSeparator();
         searchInBookAction.setEnabled(false);
         toolbar.add(searchInBookAction);
+        previousOccurenceAction.setEnabled(false);
+        toolbar.add(previousOccurenceAction);
+        nextOccurenceAction.setEnabled(false);
+        toolbar.add(nextOccurenceAction);
 
         add(toolbar, BorderLayout.NORTH);
     }

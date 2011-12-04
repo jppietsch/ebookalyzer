@@ -44,12 +44,8 @@ public final class Chapter {
         return text;
     }
 
-    public int search(String word) {
-        int index = text.indexOf(word);
-        if (index >= 0) {
-            System.out.println(word + " gefunden in Kapitel " + label + " an Position " + index);
-        }
-        return index;
+    public boolean search(String word) {
+        return text.indexOf(word) >= 0;
     }
 
 }

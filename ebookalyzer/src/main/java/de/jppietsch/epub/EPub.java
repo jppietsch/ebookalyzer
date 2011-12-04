@@ -59,8 +59,7 @@ public final class EPub {
     public int search(String word) {
         int chapterIndex = 0;
         for (Chapter chapter: chapters) {
-            int index = chapter.search(word);
-            if (index >= 0) {
+            if (chapter.search(word)) {
                 return chapterIndex;
             }
             chapterIndex++;

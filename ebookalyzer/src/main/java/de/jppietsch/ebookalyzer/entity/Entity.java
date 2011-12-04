@@ -14,11 +14,14 @@
 // If not, see <http://www.gnu.org/licenses/>.
 package de.jppietsch.ebookalyzer.entity;
 
+import static java.util.regex.Pattern.quote;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 public final class Entity implements Serializable {
 
@@ -64,6 +67,18 @@ public final class Entity implements Serializable {
             result.add(new TextSegment(index, length));
             index = text.indexOf(name, index + name.length());
         }
+    }
+
+    public Pattern getPattern() {
+        StringBuilder builder = new StringBuilder();
+
+        builder.append(quote(primaryName));
+        for (String secondaryName: secondaryNames) {
+            builder.append('|');
+            builder.append(quote(secondaryName));
+        }
+
+        return Pattern.compile(builder.toString(), Pattern.DOTALL);
     }
 
 }
