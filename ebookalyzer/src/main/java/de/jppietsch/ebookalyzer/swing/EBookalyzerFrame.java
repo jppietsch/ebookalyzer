@@ -29,6 +29,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.StringReader;
+import java.text.MessageFormat;
 import java.util.ResourceBundle;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -38,6 +40,7 @@ import javax.swing.Action;
 import javax.swing.ImageIcon;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
+import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JOptionPane;
 import javax.swing.JScrollPane;
@@ -49,12 +52,15 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.text.BadLocationException;
+import javax.swing.text.Document;
 import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
+import javax.swing.text.html.HTMLEditorKit;
 
 import de.jppietsch.ebookalyzer.entity.Entity;
 import de.jppietsch.ebookalyzer.entity.TextSegment;
+import de.jppietsch.epub.Chapter;
 import de.jppietsch.epub.EPub;
 
 public final class EBookalyzerFrame extends JFrame {
@@ -63,7 +69,11 @@ public final class EBookalyzerFrame extends JFrame {
 
     private static final String ENTITIES_EXTENSION = "entities";
 
+    private static final MessageFormat chapterFormat = new MessageFormat("Kapitel {0} von {1}: {2}");
+
     private final JTextPane chapterPane = new JTextPane();
+
+    private JLabel statusLabel;
 
     private Dictionary listModel = new Dictionary();
 
@@ -75,9 +85,9 @@ public final class EBookalyzerFrame extends JFrame {
 
     private Entity selectedEntity;
 
-    private EPub epub;
+    private EPub book;
 
-    private int page;
+    private int chapterIndex;
 
     private final FileNameExtensionFilter entityFilter = new FileNameExtensionFilter("Entitäten", ENTITIES_EXTENSION);
 
@@ -205,10 +215,10 @@ public final class EBookalyzerFrame extends JFrame {
         int choice = chooser.showOpenDialog(this);
         if (choice == JFileChooser.APPROVE_OPTION) {
             try {
-                epub = new EPub(chooser.getSelectedFile());
-                page = 0;
-                setTitle(TITLE + " - " + epub.getTitle());
-                displayPage();
+                book = new EPub(chooser.getSelectedFile());
+                chapterIndex = 0;
+                setTitle(TITLE + " - " + book.getTitle());
+                displayChapter();
                 searchInBookAction.setEnabled(true);
             } catch (IOException e) {
                 e.printStackTrace();
@@ -318,31 +328,31 @@ public final class EBookalyzerFrame extends JFrame {
     }
 
     void firstPage() {
-        page = 0;
-        displayPage();
+        chapterIndex = 0;
+        displayChapter();
     }
 
     void previousPage() {
-        page--;
-        displayPage();
+        chapterIndex--;
+        displayChapter();
     }
 
     void nextPage() {
-        page++;
-        displayPage();
+        chapterIndex++;
+        displayChapter();
     }
 
     void lastPage() {
-        page = epub.getChapters().size() - 1;
-        displayPage();
+        chapterIndex = book.getChapters().size() - 1;
+        displayChapter();
     }
 
     void searchInBook() {
         String word = JOptionPane.showInputDialog(this, "Suche");
-        int chapterIndex = epub.search(word);
-        if (chapterIndex >= 0) {
-            page = chapterIndex;
-            displayPage();
+        int ci = book.search(word);
+        if (ci >= 0) {
+            chapterIndex = ci;
+            displayChapter();
             StyledDocument styledDocument = chapterPane.getStyledDocument();
             try {
                 int offset = styledDocument.getText(0, styledDocument.getLength()).indexOf(word);
@@ -379,6 +389,7 @@ public final class EBookalyzerFrame extends JFrame {
     void searchNextOccurence() {
         Pattern pattern = selectedEntity.getPattern();
         StyledDocument document = chapterPane.getStyledDocument();
+        System.out.println("document == " + document);
         try {
             int caretPosition = chapterPane.getCaretPosition();
             Matcher matcher = pattern.matcher(document.getText(caretPosition, document.getLength() - caretPosition));
@@ -387,10 +398,37 @@ public final class EBookalyzerFrame extends JFrame {
                 select(caretPosition + matcher.start(), matcher.group());
             } else {
                 System.out.println("kein weiteres Vorkommen gefunden im aktuellen Kapitel.");
+                searchNextOccurenceInBook(pattern);
             }
         } catch (BadLocationException e) {
             throw new IllegalStateException(e);
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
         }
+    }
+
+    private void searchNextOccurenceInBook(Pattern pattern) throws IOException, BadLocationException {
+        HTMLEditorKit kit = new HTMLEditorKit();
+        for (int ci = chapterIndex + 1; ci < book.getChapters().size(); ci++) {
+            Matcher matcher = searchNextInChapter(pattern, kit, ci);
+            if (matcher.find()) {
+                chapterIndex = ci;
+                displayChapter();
+                searchNextOccurence();
+                return;
+            }
+        }
+        JOptionPane.showConfirmDialog(this, "kein weiteres Vorkommen gefunden", "Suchen", JOptionPane.OK_CANCEL_OPTION);
+    }
+
+    private Matcher searchNextInChapter(Pattern pattern, HTMLEditorKit kit, int index) throws IOException,
+            BadLocationException {
+        Chapter chapter = book.getChapters().get(index);
+        Document document = kit.createDefaultDocument();
+        String rawText = chapter.getText();
+        kit.read(new StringReader(rawText), document, 0);
+        String searchableText = document.getText(0, document.getLength());
+        return pattern.matcher(searchableText);
     }
 
     private void select(int offset, String word) {
@@ -399,17 +437,21 @@ public final class EBookalyzerFrame extends JFrame {
         chapterPane.requestFocusInWindow();
     }
 
-    private void displayPage() {
+    private void displayChapter() {
         firstAction.setEnabled(true);
-        previousAction.setEnabled(page > 0);
-        nextAction.setEnabled(page < epub.getChapters().size() - 1);
+        previousAction.setEnabled(chapterIndex > 0);
+        nextAction.setEnabled(chapterIndex < book.getChapters().size() - 1);
         lastAction.setEnabled(true);
 
         chapterPane.setContentType("text/html");
-        String text = epub.getChapters().get(page).getText();
+        Chapter currentChapter = book.getChapters().get(chapterIndex);
+        String text = currentChapter.getText();
         chapterPane.setText(text);
         highlight((StyledDocument) chapterPane.getDocument(), true);
         chapterPane.setCaretPosition(0);
+
+        statusLabel.setText(chapterFormat.format(new Object[] {chapterIndex, book.getChapters().size(),
+                currentChapter.getTitle()}));
     }
 
     private void initToolBar() {
@@ -465,6 +507,10 @@ public final class EBookalyzerFrame extends JFrame {
         toolbar.add(previousOccurenceAction);
         nextOccurenceAction.setEnabled(false);
         toolbar.add(nextOccurenceAction);
+
+        toolbar.addSeparator();
+        statusLabel = new JLabel(chapterFormat.format(new Object[] {"?", "?", "?"}));
+        toolbar.add(statusLabel);
 
         add(toolbar, BorderLayout.NORTH);
     }
